@@ -1,0 +1,96 @@
+2026-04-21 18:32:35 [restartedMain] INFO  c.pred.pred_api.PredApiApplication - Starting PredApiApplication using Java 17.0.18 with PID 4212 (C:\Users\pc\Desktop\pred-api\target\classes started by pc in C:\Users\pc\Desktop\pred-api)
+2026-04-21 18:32:35 [restartedMain] DEBUG c.pred.pred_api.PredApiApplication - Running with Spring Boot v3.4.4, Spring v6.2.5
+2026-04-21 18:32:35 [restartedMain] INFO  c.pred.pred_api.PredApiApplication - No active profile set, falling back to 1 default profile: "default"
+2026-04-21 18:32:35 [restartedMain] INFO  o.s.b.d.e.DevToolsPropertyDefaultsPostProcessor - Devtools property defaults active! Set 'spring.devtools.add-properties' to 'false' to disable
+2026-04-21 18:32:35 [restartedMain] INFO  o.s.b.d.e.DevToolsPropertyDefaultsPostProcessor - For additional web related logging consider setting the 'logging.level.web' property to 'DEBUG'
+2026-04-21 18:32:36 [restartedMain] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-04-21 18:32:36 [restartedMain] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 141 ms. Found 14 JPA repository interfaces.
+2026-04-21 18:32:37 [restartedMain] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 8080 (http)
+2026-04-21 18:32:37 [restartedMain] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-04-21 18:32:37 [restartedMain] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.39]
+2026-04-21 18:32:37 [restartedMain] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-04-21 18:32:37 [restartedMain] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 2347 ms
+2026-04-21 18:32:37 [restartedMain] INFO  o.h.jpa.internal.util.LogHelper - HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-04-21 18:32:37 [restartedMain] INFO  org.hibernate.Version - HHH000412: Hibernate ORM core version 6.6.11.Final
+2026-04-21 18:32:37 [restartedMain] INFO  o.h.c.i.RegionFactoryInitiator - HHH000026: Second-level cache disabled
+2026-04-21 18:32:38 [restartedMain] INFO  o.s.o.j.p.SpringPersistenceUnitInfo - No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-04-21 18:32:38 [restartedMain] INFO  com.zaxxer.hikari.HikariDataSource - PRED_HikariCP - Starting...
+2026-04-21 18:32:38 [restartedMain] INFO  com.zaxxer.hikari.pool.HikariPool - PRED_HikariCP - Added connection com.mysql.cj.jdbc.ConnectionImpl@1db2a150
+2026-04-21 18:32:38 [restartedMain] INFO  com.zaxxer.hikari.HikariDataSource - PRED_HikariCP - Start completed.
+2026-04-21 18:32:38 [restartedMain] WARN  org.hibernate.orm.deprecation - HHH90000025: MySQL8Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-04-21 18:32:38 [restartedMain] WARN  org.hibernate.orm.deprecation - HHH90000026: MySQL8Dialect has been deprecated; use org.hibernate.dialect.MySQLDialect instead
+2026-04-21 18:32:38 [restartedMain] INFO  o.hibernate.orm.connections.pooling - HHH10001005: Database info:
+	Database JDBC URL [Connecting through datasource 'HikariDataSource (PRED_HikariCP)']
+	Database driver: undefined/unknown
+	Database version: 8.0
+	Autocommit mode: undefined/unknown
+	Isolation level: undefined/unknown
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-04-21 18:32:40 [restartedMain] INFO  o.h.e.t.j.p.i.JtaPlatformInitiator - HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-04-21 18:32:40 [restartedMain] DEBUG org.hibernate.SQL - 
+    create table demande_piece (
+        id bigint not null auto_increment,
+        date_envoi datetime(6),
+        date_expiration datetime(6),
+        delai_jour integer,
+        message TEXT not null,
+        statut enum ('EN_ATTENTE','EXPIREE','SATISFAITE'),
+        greffier_id bigint not null,
+        recours_id bigint not null,
+        primary key (id)
+    ) engine=InnoDB
+2026-04-21 18:32:40 [restartedMain] DEBUG org.hibernate.SQL - 
+    alter table historique_statut 
+       modify column ancien_statut varchar(255) not null
+2026-04-21 18:32:40 [restartedMain] DEBUG org.hibernate.SQL - 
+    alter table historique_statut 
+       modify column nouveau_statut varchar(255) not null
+2026-04-21 18:32:40 [restartedMain] DEBUG org.hibernate.SQL - 
+    alter table piece_jointe 
+       modify column chemin_fichier varchar(255) not null
+2026-04-21 18:32:40 [restartedMain] DEBUG org.hibernate.SQL - 
+    alter table demande_piece 
+       add constraint FK7obvuk1a0qb0f42ymtvge8iwh 
+       foreign key (greffier_id) 
+       references utilisateur (id)
+2026-04-21 18:32:40 [restartedMain] DEBUG org.hibernate.SQL - 
+    alter table demande_piece 
+       add constraint FKbktodr16ysestat1gl7l489vg 
+       foreign key (recours_id) 
+       references recours (id)
+2026-04-21 18:32:40 [restartedMain] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-04-21 18:32:41 [restartedMain] INFO  o.s.d.j.r.query.QueryEnhancerFactory - Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-04-21 18:32:42 [restartedMain] DEBUG c.p.p.config.JwtAuthenticationFilter - Filter 'jwtAuthenticationFilter' configured for use
+2026-04-21 18:32:44 [restartedMain] INFO  o.s.s.c.a.a.c.InitializeAuthenticationProviderBeanManagerConfigurer$InitializeAuthenticationProviderManagerConfigurer - Global AuthenticationManager configured with AuthenticationProvider bean with name authenticationProvider
+2026-04-21 18:32:44 [restartedMain] WARN  o.s.s.c.a.a.c.InitializeUserDetailsBeanManagerConfigurer$InitializeUserDetailsManagerConfigurer - Global AuthenticationManager configured with an AuthenticationProvider bean. UserDetailsService beans will not be used by Spring Security for automatically configuring username/password login. Consider removing the AuthenticationProvider bean. Alternatively, consider using the UserDetailsService in a manually instantiated DaoAuthenticationProvider. If the current configuration is intentional, to turn off this warning, increase the logging level of 'org.springframework.security.config.annotation.authentication.configuration.InitializeUserDetailsBeanManagerConfigurer' to ERROR
+2026-04-21 18:32:44 [restartedMain] WARN  o.s.b.w.s.c.AnnotationConfigServletWebServerApplicationContext - Exception encountered during context initialization - cancelling refresh attempt: org.springframework.beans.factory.UnsatisfiedDependencyException: Error creating bean with name 'org.springframework.security.config.annotation.web.configuration.WebSecurityConfiguration': Unsatisfied dependency expressed through field 'httpSecurity': Error creating bean with name 'org.springframework.security.config.annotation.web.configuration.HttpSecurityConfiguration': Unsatisfied dependency expressed through method 'setContentNegotiationStrategy' parameter 0: Error creating bean with name 'org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration$EnableWebMvcConfiguration': Unsatisfied dependency expressed through constructor parameter 1: Error creating bean with name 'spring.web-org.springframework.boot.autoconfigure.web.WebProperties': Could not bind properties to 'WebProperties' : prefix=spring.web, ignoreInvalidFields=false, ignoreUnknownFields=true
+2026-04-21 18:32:44 [restartedMain] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Closing JPA EntityManagerFactory for persistence unit 'default'
+2026-04-21 18:32:44 [restartedMain] INFO  com.zaxxer.hikari.HikariDataSource - PRED_HikariCP - Shutdown initiated...
+2026-04-21 18:32:44 [restartedMain] INFO  com.zaxxer.hikari.HikariDataSource - PRED_HikariCP - Shutdown completed.
+2026-04-21 18:32:44 [restartedMain] INFO  o.a.catalina.core.StandardService - Stopping service [Tomcat]
+2026-04-21 18:32:44 [restartedMain] INFO  o.s.b.a.l.ConditionEvaluationReportLogger - 
+
+Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+2026-04-21 18:32:44 [restartedMain] ERROR o.s.b.d.LoggingFailureAnalysisReporter - 
+
+***************************
+APPLICATION FAILED TO START
+***************************
+
+Description:
+
+Failed to bind properties under 'spring.web.locale-resolver' to org.springframework.boot.autoconfigure.web.WebProperties$LocaleResolver:
+
+    Property: spring.web.locale-resolver
+    Value: "session"
+    Origin: class path resource [application.properties] - 62:28
+    Reason: failed to convert java.lang.String to org.springframework.boot.autoconfigure.web.WebProperties$LocaleResolver (caused by java.lang.IllegalArgumentException: No enum constant org.springframework.boot.autoconfigure.web.WebProperties.LocaleResolver.session)
+
+Action:
+
+Update your application's configuration. The following values are valid:
+
+    ACCEPT_HEADER
+    FIXED
+
