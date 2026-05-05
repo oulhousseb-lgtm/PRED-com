@@ -49,4 +49,10 @@ public interface RecoursRepository extends JpaRepository<Recours, Long> {
 
     @Query("SELECT r.statut, COUNT(r) FROM Recours r WHERE r.utilisateur = :utilisateur GROUP BY r.statut")
     List<Object[]> countByStatutGroupByStatutForUser(@Param("utilisateur") User utilisateur);
+
+    @Query("SELECT DISTINCT r FROM Recours r " +
+            "JOIN FETCH r.typeRecours tr " +
+            "JOIN FETCH r.utilisateur u " +
+            "ORDER BY r.dateDepot DESC")
+    List<Recours> findAllWithDetails();
 }

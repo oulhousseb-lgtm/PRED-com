@@ -37,6 +37,33 @@ public class TypeRecoursService {
                 .collect(Collectors.toList());
     }
 
+    // ============================================================
+    // NOUVEAU : Version optimisée qui évite le problème N+1
+    // Utilise une seule requête SQL avec JOIN + GROUP BY
+    // au lieu de 116 requêtes séparées
+    // ============================================================
+    public List<TypeRecoursResponse> findAllActiveOptimized() {
+        List<Object[]> results = typeRecoursRepository.findAllActiveWithRecoursCount();
+
+        return results.stream().map(row -> {
+            TypeRecours tr = (TypeRecours) row[0];
+            Long count = (Long) row[1];
+
+            return TypeRecoursResponse.builder()
+                    .id(tr.getId())
+                    .code(tr.getCode())
+                    .categorie(tr.getCategorie())
+                    .libelleFr(tr.getLibelleFr())
+                    .libelleAr(tr.getLibelleAr())
+                    .descriptionFr(tr.getDescriptionFr())
+                    .descriptionAr(tr.getDescriptionAr())
+                    .actif(tr.getActif())
+                    .dateCreation(tr.getDateCreation())
+                    .nombreRecours(count)
+                    .build();
+        }).collect(Collectors.toList());
+    }
+
     public List<TypeRecoursResponse> findByCategorie(String categorie) {
         return typeRecoursRepository.findByCategorieAndActifTrue(categorie).stream()
                 .map(this::toResponse)
@@ -65,7 +92,6 @@ public class TypeRecoursService {
 
     @Transactional
     public TypeRecoursResponse create(TypeRecoursRequest request) {
-        // Validation
         if (typeRecoursRepository.existsByCode(request.getCode())) {
             throw new RuntimeException("Ce code est déjà utilisé");
         }
@@ -131,7 +157,6 @@ public class TypeRecoursService {
     public void delete(Long id) {
         TypeRecours typeRecours = findEntityById(id);
 
-        // Vérifier si le type est utilisé
         long count = recoursRepository.countByTypeRecours(typeRecours);
         if (count > 0) {
             throw new RuntimeException("Impossible de supprimer ce type car il est utilisé par " + count + " recours");

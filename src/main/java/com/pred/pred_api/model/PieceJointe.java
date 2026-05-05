@@ -32,6 +32,12 @@ public class PieceJointe {
     @Column(nullable = false, name = "chemin_fichier")
     private String cheminFichier;
 
+    // ============================================================
+    // MODIFICATION : PieceJointe.java - Ajouter après chemin_fichier
+    // ============================================================
+    @Column(length = 500, name = "chemin_stockage")
+    private String cheminStockage;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, name = "type_document")
     private TypeDocument typeDocument;

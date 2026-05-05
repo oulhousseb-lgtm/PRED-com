@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -84,6 +85,9 @@ public class RecoursController {
     // Gestion des pièces jointes
     // ============================================================
 
+    // ============================================================
+// MODIFICATION : RecoursController.java - Remplacer uploadPiece
+// ============================================================
     @PostMapping("/{id}/pieces")
     public ResponseEntity<Map<String, Object>> uploadPiece(
             @AuthenticationPrincipal UserDetails userDetails,
@@ -91,7 +95,8 @@ public class RecoursController {
             @RequestParam("file") MultipartFile file,
             @RequestParam("typeDocument") String typeDocument,
             @RequestParam(value = "descriptionFr", required = false) String descriptionFr,
-            @RequestParam(value = "descriptionAr", required = false) String descriptionAr) {
+            @RequestParam(value = "descriptionAr", required = false) String descriptionAr,
+            @RequestParam(value = "chemin", required = false, defaultValue = "") String chemin) {
 
         User user = userService.findByEmail(userDetails.getUsername());
         RecoursResponse recours = recoursService.findById(id);
@@ -102,21 +107,19 @@ public class RecoursController {
 
         try {
             TypeDocument type = TypeDocument.valueOf(typeDocument.toUpperCase());
-            var piece = recoursService.uploadPiece(id, file, type, descriptionFr, descriptionAr);
+            var piece = recoursService.uploadPiece(id, file, type, descriptionFr, descriptionAr, chemin);
 
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Pièce jointe ajoutée avec succès");
             response.put("pieceId", piece.getId());
             response.put("nomFichier", piece.getNomFichier());
+            response.put("cheminStockage", piece.getCheminStockage());
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("error", "Type de document invalide");
-            return ResponseEntity.badRequest().body(response);
+            return ResponseEntity.badRequest().body(Map.of("error", "Type de document invalide"));
         } catch (IOException e) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("error", "Erreur lors de l'upload du fichier");
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Erreur lors de l'upload du fichier"));
         }
     }
 
@@ -192,17 +195,6 @@ public class RecoursController {
     // Recherche et filtrage (Agents)
     // ============================================================
 
-    @GetMapping("/all")
-    public ResponseEntity<List<RecoursResponse>> getAllRecours(
-            @AuthenticationPrincipal UserDetails userDetails) {
-        User user = userService.findByEmail(userDetails.getUsername());
-
-        if (!isAgent(user)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
-
-        return ResponseEntity.ok(recoursService.findAll());
-    }
 
     @GetMapping("/statut/{statut}")
     public ResponseEntity<List<RecoursResponse>> getRecoursByStatut(
@@ -238,6 +230,13 @@ public class RecoursController {
 
         // TODO: Implémenter la recherche avancée
         return ResponseEntity.ok(recoursService.findAll());
+    }
+
+    @GetMapping("/all")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('GREFFIER')")
+    public ResponseEntity<List<RecoursResponse>> getAllRecours() {
+        List<RecoursResponse> recours = recoursService.findAll();
+        return ResponseEntity.ok(recours);
     }
 
     // ============================================================

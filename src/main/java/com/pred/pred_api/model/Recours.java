@@ -38,6 +38,13 @@ public class Recours {
     @JoinColumn(name = "utilisateur_id", nullable = false)
     private User utilisateur;
 
+    // ============================================================
+    // MODIFICATION : Recours.java - Ajouter après utilisateur_id
+    // ============================================================
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "dossier_id")
+    private Dossier dossier;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "type_recours_id", nullable = false)
     private TypeRecours typeRecours;
@@ -87,6 +94,7 @@ public class Recours {
     // ============================================================
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    @Builder.Default
     private StatutRecours statut = StatutRecours.BROUILLON;
 
     // ============================================================
@@ -111,21 +119,26 @@ public class Recours {
     private String notesInternes;
 
     // ============================================================
-    // Relations OneToMany
+    // Relations OneToMany - @Builder.Default pour éviter NullPointerException
     // ============================================================
     @OneToMany(mappedBy = "recours", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @Builder.Default
     private List<Appelant> appelants = new ArrayList<>();
 
     @OneToMany(mappedBy = "recours", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @Builder.Default
     private List<Accuse> accuses = new ArrayList<>();
 
     @OneToMany(mappedBy = "recours", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @Builder.Default
     private List<Temoin> temoins = new ArrayList<>();
 
     @OneToMany(mappedBy = "recours", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @Builder.Default
     private List<PieceJointe> piecesJointes = new ArrayList<>();
 
     @OneToMany(mappedBy = "recours", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @Builder.Default
     private List<HistoriqueStatut> historiqueStatuts = new ArrayList<>();
 
     // ============================================================

@@ -25,7 +25,7 @@ public class HistoriqueStatut {
     @JoinColumn(name = "recours_id", nullable = false)
     private Recours recours;
 
-    @Column(nullable = false, name = "ancien_statut")
+    @Column( name = "ancien_statut")
     private String ancienStatut;
 
     @Column(nullable = false, name = "nouveau_statut")

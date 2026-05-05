@@ -241,7 +241,7 @@ public class RecoursService {
         return recoursRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Recours non trouvé avec l'ID : " + id));
     }
-
+    @Transactional(readOnly = true)
     public List<RecoursResponse> findByUtilisateur(Long utilisateurId) {
         User utilisateur = userRepository.findById(utilisateurId)
                 .orElseThrow(() -> new ResourceNotFoundException("Utilisateur non trouvé"));
@@ -257,8 +257,9 @@ public class RecoursService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<RecoursResponse> findAll() {
-        return recoursRepository.findAll().stream()
+        return recoursRepository.findAllWithDetails().stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
@@ -301,7 +302,7 @@ public class RecoursService {
                                       String commentaireFr, String commentaireAr) {
         HistoriqueStatut historique = HistoriqueStatut.builder()
                 .recours(recours)
-                .ancienStatut(ancienStatut != null ? ancienStatut.name() : null)
+                .ancienStatut(ancienStatut != null ? ancienStatut.name() : "CREATION")
                 .nouveauStatut(nouveauStatut.name())
                 .modifiePar(modifiePar)
                 .commentaireFr(commentaireFr)
@@ -346,21 +347,32 @@ public class RecoursService {
         return toResponse(savedRecours);
     }
 
-    // ============================================================
-    // Gestion des pièces jointes
-    // ============================================================
+// ============================================================
+// REMPLACER les 3 méthodes ci-dessus par ceci :
+// ============================================================
+
+// ============================================================
+// Gestion des pièces jointes (version avec chemin hiérarchique)
+// ============================================================
 
     @Transactional
     public PieceJointe uploadPiece(Long recoursId, MultipartFile file, TypeDocument typeDocument,
-                                   String descriptionFr, String descriptionAr) throws IOException {
+                                   String descriptionFr, String descriptionAr, String cheminStockage) throws IOException {
         Recours recours = findEntityById(recoursId);
 
-        String cheminFichier = uploadFile(file, "pieces");
+        // Si un chemin de stockage est fourni (ex: "2026/2609/72/"), l'utiliser
+        // Sinon, utiliser "pieces/" comme avant
+        String dossierStockage = (cheminStockage != null && !cheminStockage.isEmpty())
+                ? cheminStockage
+                : "pieces";
+
+        String cheminFichier = uploadFile(file, dossierStockage);
 
         PieceJointe pieceJointe = PieceJointe.builder()
                 .recours(recours)
                 .nomFichier(file.getOriginalFilename())
                 .cheminFichier(cheminFichier)
+                .cheminStockage(dossierStockage)  // Stocker le chemin hiérarchique
                 .typeDocument(typeDocument)
                 .descriptionFr(descriptionFr)
                 .descriptionAr(descriptionAr)
@@ -371,7 +383,15 @@ public class RecoursService {
         return pieceJointeRepository.save(pieceJointe);
     }
 
+    // Surcharge pour rétrocompatibilité (sans cheminStockage)
+    @Transactional
+    public PieceJointe uploadPiece(Long recoursId, MultipartFile file, TypeDocument typeDocument,
+                                   String descriptionFr, String descriptionAr) throws IOException {
+        return uploadPiece(recoursId, file, typeDocument, descriptionFr, descriptionAr, "pieces");
+    }
+
     private String uploadFile(MultipartFile file, String sousDossier) throws IOException {
+        // Construire le chemin complet : uploadDir/sousDossier/
         Path uploadPath = Paths.get(uploadDir, sousDossier);
         if (!Files.exists(uploadPath)) {
             Files.createDirectories(uploadPath);
@@ -388,7 +408,6 @@ public class RecoursService {
         // Implémentation simplifiée - à compléter avec SHA-256
         return UUID.randomUUID().toString().replace("-", "");
     }
-
     // ============================================================
     // Statistiques
     // ============================================================
@@ -409,21 +428,31 @@ public class RecoursService {
     // Conversion DTO
     // ============================================================
 
+    // ============================================================
+// CORRECTION FINALE : toResponse() avec gestion des listes null
+// et accès sécurisé aux objets imbriqués
+// ============================================================
     private RecoursResponse toResponse(Recours recours) {
         return RecoursResponse.builder()
                 .id(recours.getId())
                 .numeroRecours(recours.getNumeroRecours())
-                .typeRecoursId(recours.getTypeRecours().getId())
-                .typeRecoursCode(recours.getTypeRecours().getCode())
-                .typeRecoursLibelleFr(recours.getTypeRecours().getLibelleFr())
-                .typeRecoursLibelleAr(recours.getTypeRecours().getLibelleAr())
-                .typeRecoursCategorie(recours.getTypeRecours().getCategorie())
-                .deposantId(recours.getUtilisateur().getId())
-                .deposantNomFr(recours.getUtilisateur().getNomFr())
-                .deposantPrenomFr(recours.getUtilisateur().getPrenomFr())
-                .deposantNomAr(recours.getUtilisateur().getNomAr())
-                .deposantPrenomAr(recours.getUtilisateur().getPrenomAr())
-                .deposantEmail(recours.getUtilisateur().getEmail())
+
+                // Accès sécurisé au typeRecours
+                .typeRecoursId(recours.getTypeRecours() != null ? recours.getTypeRecours().getId() : null)
+                .typeRecoursCode(recours.getTypeRecours() != null ? recours.getTypeRecours().getCode() : null)
+                .typeRecoursLibelleFr(recours.getTypeRecours() != null ? recours.getTypeRecours().getLibelleFr() : null)
+                .typeRecoursLibelleAr(recours.getTypeRecours() != null ? recours.getTypeRecours().getLibelleAr() : null)
+                .typeRecoursCategorie(recours.getTypeRecours() != null ? recours.getTypeRecours().getCategorie() : null)
+
+                // Accès sécurisé à l'utilisateur
+                .deposantId(recours.getUtilisateur() != null ? recours.getUtilisateur().getId() : null)
+                .deposantNomFr(recours.getUtilisateur() != null ? recours.getUtilisateur().getNomFr() : null)
+                .deposantPrenomFr(recours.getUtilisateur() != null ? recours.getUtilisateur().getPrenomFr() : null)
+                .deposantNomAr(recours.getUtilisateur() != null ? recours.getUtilisateur().getNomAr() : null)
+                .deposantPrenomAr(recours.getUtilisateur() != null ? recours.getUtilisateur().getPrenomAr() : null)
+                .deposantEmail(recours.getUtilisateur() != null ? recours.getUtilisateur().getEmail() : null)
+
+                // Champs simples (pas de risque NPE)
                 .numeroDecisionAttaque(recours.getNumeroDecisionAttaque())
                 .dateDecisionAttaque(recours.getDateDecisionAttaque())
                 .juridictionSourceFr(recours.getJuridictionSourceFr())
@@ -439,13 +468,14 @@ public class RecoursService {
                 .decisionFinaleAr(recours.getDecisionFinaleAr())
                 .fichierDecision(recours.getFichierDecision())
                 .chambre(recours.getChambre())
-                .nombreAppelants(recours.getAppelants().size())
-                .nombreAccuses(recours.getAccuses().size())
-                .nombreTemoins(recours.getTemoins().size())
-                .nombrePiecesJointes(recours.getPiecesJointes().size())
+
+                // Listes avec vérification null
+                .nombreAppelants(recours.getAppelants() != null ? recours.getAppelants().size() : 0)
+                .nombreAccuses(recours.getAccuses() != null ? recours.getAccuses().size() : 0)
+                .nombreTemoins(recours.getTemoins() != null ? recours.getTemoins().size() : 0)
+                .nombrePiecesJointes(recours.getPiecesJointes() != null ? recours.getPiecesJointes().size() : 0)
                 .build();
     }
-
     private RecoursResponse toDetailedResponse(Recours recours) {
         RecoursResponse response = toResponse(recours);
 
@@ -613,4 +643,6 @@ public class RecoursService {
     public Double getDelaiMoyenTraitement() {
         return historiqueStatutRepository.getDelaiMoyenTraitement();
     }
+
+
 }

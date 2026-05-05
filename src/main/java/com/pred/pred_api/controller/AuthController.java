@@ -94,9 +94,12 @@ public class AuthController {
             Map<String, String> response = new HashMap<>();
             response.put("message", "Un email de réinitialisation a été envoyé");
             response.put("status", "SUCCESS");
+            // ============================================================
+            // AJOUTER CETTE LIGNE pour que le frontend puisse créer le lien
+            // ============================================================
+            response.put("token", token);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            // Ne pas révéler si l'email existe ou non (sécurité)
             Map<String, String> response = new HashMap<>();
             response.put("message", "Si cet email existe, un lien de réinitialisation a été envoyé");
             response.put("status", "SUCCESS");

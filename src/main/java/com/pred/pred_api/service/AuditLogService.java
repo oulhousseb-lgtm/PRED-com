@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -56,28 +57,32 @@ public class AuditLogService {
         return auditLogRepository.findAllByOrderByDateActionDesc();
     }
 
-    // Ajouter ces méthodes dans AuditLogService.java
+    // ============================================================
+    // DTO Methods - @Transactional pour éviter LazyInitializationException
+    // ============================================================
 
+    @Transactional(readOnly = true)
     public List<AuditLogResponse> getAllLogsDTO() {
         return auditLogRepository.findAllByOrderByDateActionDesc().stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<AuditLogResponse> getLogsByUserDTO(Long userId) {
         return auditLogRepository.findByUtilisateurId(userId).stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<AuditLogResponse> getLogsByActionDTO(String action) {
         return auditLogRepository.findByActionOrderByDateActionDesc(action).stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
 
-    // Dans AuditLogService.java, remplacer la méthode getRecentLogs
-
+    @Transactional(readOnly = true)
     public List<AuditLogResponse> getRecentLogs(int limit) {
         Pageable pageable = PageRequest.of(0, limit);
         return auditLogRepository.findRecentLogs(pageable).stream()
@@ -86,12 +91,32 @@ public class AuditLogService {
     }
 
     private AuditLogResponse toDTO(AuditLog auditLog) {
+        // Gestion sécurisée du User (évite LazyInitializationException)
+        String nomUtilisateur = "SYSTEM";
+        String prenomUtilisateur = "";
+        String emailUtilisateur = "";
+        Long utilisateurId = null;
+
+        if (auditLog.getUtilisateur() != null) {
+            try {
+                nomUtilisateur = auditLog.getUtilisateur().getNomFr() != null ?
+                        auditLog.getUtilisateur().getNomFr() : "SYSTEM";
+                prenomUtilisateur = auditLog.getUtilisateur().getPrenomFr() != null ?
+                        auditLog.getUtilisateur().getPrenomFr() : "";
+                emailUtilisateur = auditLog.getUtilisateur().getEmail() != null ?
+                        auditLog.getUtilisateur().getEmail() : "";
+                utilisateurId = auditLog.getUtilisateur().getId();
+            } catch (Exception e) {
+                // En cas de LazyInitializationException, garder les valeurs par défaut
+            }
+        }
+
         return AuditLogResponse.builder()
                 .id(auditLog.getId())
-                .utilisateurId(auditLog.getUtilisateur() != null ? auditLog.getUtilisateur().getId() : null)
-                .utilisateurNom(auditLog.getUtilisateur() != null ? auditLog.getUtilisateur().getNomFr() : "SYSTEM")
-                .utilisateurPrenom(auditLog.getUtilisateur() != null ? auditLog.getUtilisateur().getPrenomFr() : "")
-                .utilisateurEmail(auditLog.getUtilisateur() != null ? auditLog.getUtilisateur().getEmail() : "")
+                .utilisateurId(utilisateurId)
+                .utilisateurNom(nomUtilisateur)
+                .utilisateurPrenom(prenomUtilisateur)
+                .utilisateurEmail(emailUtilisateur)
                 .action(auditLog.getAction())
                 .description(auditLog.getDescription())
                 .adresseIp(auditLog.getAdresseIp())
