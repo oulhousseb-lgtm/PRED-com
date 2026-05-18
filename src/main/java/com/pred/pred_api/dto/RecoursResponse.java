@@ -23,6 +23,14 @@ public class RecoursResponse {
     private String numeroRecours;
 
     // ============================================================
+    // ✅ AJOUT : Informations du dossier parent
+    // ============================================================
+    private Long dossierId;
+    private String dossierNumero;
+    private String dossierTitreFr;
+    private String dossierTitreAr;
+
+    // ============================================================
     // Type de recours
     // ============================================================
     private Long typeRecoursId;
@@ -92,6 +100,13 @@ public class RecoursResponse {
     private List<TemoinResponseDTO> temoins;
     private List<PieceJointeResponseDTO> piecesJointes;
     private List<HistoriqueStatutResponseDTO> historique;
+
+
+    private String presidentNom;
+    private String membre1Nom;
+    private String membre2Nom;
+    private String representantMinistere;
+    private String greffierAudience;
 
     // ============================================================
     // DTOs internes pour les réponses détaillées

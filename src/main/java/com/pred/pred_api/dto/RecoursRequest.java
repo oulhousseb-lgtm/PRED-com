@@ -32,6 +32,7 @@ public class RecoursRequest {
     private List<AppelantDTO> appelants;
     private List<AccuseDTO> accuses;
     private List<TemoinDTO> temoins;
+    private List<VictimeDTO> victimes;  // ← AJOUT
 
     // ============================================================
     // DTOs internes
@@ -115,5 +116,42 @@ public class RecoursRequest {
         // Témoignage
         private String temoignageFr;
         private String temoignageAr;
+    }
+
+    // ============================================================
+    // NOUVEAU : VictimeDTO
+    // ============================================================
+    @Data
+    public static class VictimeDTO {
+        // Identité
+        private String cin;
+        private String nomFr;
+        private String prenomFr;
+        private String nomAr;
+        private String prenomAr;
+
+        // Informations personnelles
+        private String genre;
+        private LocalDate dateNaissance;
+        private String lieuNaissanceFr;
+        private String lieuNaissanceAr;
+        private String situationFamiliale;
+        private String professionFr;
+        private String professionAr;
+        private String adresseFr;
+        private String adresseAr;
+        private Boolean estMajeur = true;
+
+        // Préjudice
+        private String naturePrejudice;
+        private String descriptionPrejudiceFr;
+        private String descriptionPrejudiceAr;
+
+        // Tuteur (si mineur)
+        private String tuteurNomFr;
+        private String tuteurPrenomFr;
+        private String tuteurNomAr;
+        private String tuteurPrenomAr;
+        private String tuteurCin;
     }
 }

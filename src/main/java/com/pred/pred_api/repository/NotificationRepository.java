@@ -13,9 +13,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
+
+    // ============================================================
+    // Recherche par ID (utilisé pour la suppression)
+    // ============================================================
+
+    @Query("SELECT n FROM Notification n WHERE n.id = :id")
+    Optional<Notification> findById(@Param("id") Long id);
 
     // ============================================================
     // Recherche par utilisateur
@@ -89,6 +97,12 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     void deleteByUtilisateur(User utilisateur);
 
     void deleteByRecours(Recours recours);
+
+    // ✅ Suppression par ID
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM Notification n WHERE n.id = :id")
+    void deleteByIdCustom(@Param("id") Long id);
 
     @Modifying
     @Transactional

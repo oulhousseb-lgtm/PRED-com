@@ -118,6 +118,24 @@ public class Recours {
     @Column(columnDefinition = "TEXT", name = "notes_internes")
     private String notesInternes;
 
+    // أضف هذه الحقول إلى class Recours
+    @Column(name = "president_nom", length = 100)
+    private String presidentNom;
+
+    @Column(name = "membre1_nom", length = 100)
+    private String membre1Nom;
+
+    @Column(name = "membre2_nom", length = 100)
+    private String membre2Nom;
+
+    @Column(name = "representant_ministere", length = 100)
+    private String representantMinistere;
+
+    @Column(name = "greffier_audience", length = 100)
+    private String greffierAudience;
+
+// أضف getters و setters
+
     // ============================================================
     // Relations OneToMany - @Builder.Default pour éviter NullPointerException
     // ============================================================

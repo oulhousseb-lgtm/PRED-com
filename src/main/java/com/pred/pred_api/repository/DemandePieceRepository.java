@@ -18,9 +18,7 @@ public interface DemandePieceRepository extends JpaRepository<DemandePiece, Long
     // ============================================================
     // Recherche par statut
     // ============================================================
-
     List<DemandePiece> findByStatut(StatutDemandePiece statut);
-
     long countByStatut(StatutDemandePiece statut);
 
     @Query("SELECT d FROM DemandePiece d WHERE d.statut = :statut ORDER BY d.dateEnvoi DESC")
@@ -29,9 +27,7 @@ public interface DemandePieceRepository extends JpaRepository<DemandePiece, Long
     // ============================================================
     // Recherche par recours
     // ============================================================
-
     List<DemandePiece> findByRecours(Recours recours);
-
     List<DemandePiece> findByRecoursOrderByDateEnvoiDesc(Recours recours);
 
     @Query("SELECT d FROM DemandePiece d WHERE d.recours.id = :recoursId")
@@ -44,9 +40,7 @@ public interface DemandePieceRepository extends JpaRepository<DemandePiece, Long
     // ============================================================
     // Recherche par greffier
     // ============================================================
-
     List<DemandePiece> findByGreffier(User greffier);
-
     List<DemandePiece> findByGreffierOrderByDateEnvoiDesc(User greffier);
 
     @Query("SELECT d FROM DemandePiece d WHERE d.greffier.id = :greffierId")
@@ -55,7 +49,6 @@ public interface DemandePieceRepository extends JpaRepository<DemandePiece, Long
     // ============================================================
     // Recherche par date d'expiration
     // ============================================================
-
     @Query("SELECT d FROM DemandePiece d WHERE d.dateExpiration < :date AND d.statut = 'EN_ATTENTE'")
     List<DemandePiece> findExpirees(@Param("date") LocalDateTime date);
 
@@ -67,13 +60,11 @@ public interface DemandePieceRepository extends JpaRepository<DemandePiece, Long
                                                    @Param("fin") LocalDateTime fin);
 
     List<DemandePiece> findByStatutAndDateExpirationBefore(StatutDemandePiece statut, LocalDateTime date);
-
     List<DemandePiece> findByStatutAndDateExpirationAfter(StatutDemandePiece statut, LocalDateTime date);
 
     // ============================================================
     // Recherche urgente
     // ============================================================
-
     @Query("SELECT d FROM DemandePiece d WHERE d.statut = 'EN_ATTENTE' AND d.dateExpiration > :now AND d.dateExpiration < :urgence ORDER BY d.dateExpiration ASC")
     List<DemandePiece> findUrgentes(@Param("now") LocalDateTime now,
                                     @Param("urgence") LocalDateTime urgence);
@@ -81,7 +72,6 @@ public interface DemandePieceRepository extends JpaRepository<DemandePiece, Long
     // ============================================================
     // Statistiques
     // ============================================================
-
     @Query("SELECT d.statut, COUNT(d) FROM DemandePiece d GROUP BY d.statut")
     List<Object[]> countGroupByStatut();
 
@@ -97,7 +87,6 @@ public interface DemandePieceRepository extends JpaRepository<DemandePiece, Long
     // ============================================================
     // Suppression
     // ============================================================
-
     void deleteByRecours(Recours recours);
 
     @Query("DELETE FROM DemandePiece d WHERE d.recours.id = :recoursId")
@@ -105,4 +94,5 @@ public interface DemandePieceRepository extends JpaRepository<DemandePiece, Long
 
     @Query("DELETE FROM DemandePiece d WHERE d.statut = 'EXPIREE' AND d.dateExpiration < :date")
     void deleteOldExpirees(@Param("date") LocalDateTime date);
+    void deleteById(Long id);
 }

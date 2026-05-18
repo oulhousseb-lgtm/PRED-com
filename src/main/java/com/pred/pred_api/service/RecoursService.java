@@ -1,5 +1,5 @@
 package com.pred.pred_api.service;
-
+import com.pred.pred_api.repository.DossierRepository;
 import com.pred.pred_api.dto.RecoursRequest;
 import com.pred.pred_api.dto.RecoursResponse;
 import com.pred.pred_api.dto.ChangerStatutRequest;
@@ -19,12 +19,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.security.MessageDigest;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.HashMap;   // ← IMPORT IMPORTANT
-import java.util.List;
-import java.util.Map;       // ← IMPORT IMPORTANT
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -41,7 +40,9 @@ public class RecoursService {
     private final HistoriqueStatutRepository historiqueStatutRepository;
     private final NotificationService notificationService;
     private final AuditLogService auditLogService;
-
+    // Injection du repository
+    private final VictimeRepository victimeRepository;
+    private final DossierRepository dossierRepository;
     private final String uploadDir = "./uploads/";
 
     // ============================================================
@@ -55,10 +56,8 @@ public class RecoursService {
 
         TypeRecours typeRecours = typeRecoursService.findEntityById(request.getTypeRecoursId());
 
-        // Génération du numéro de recours
         String numeroRecours = generateNumeroRecours();
 
-        // Création du recours principal
         Recours recours = Recours.builder()
                 .numeroRecours(numeroRecours)
                 .utilisateur(utilisateur)
@@ -76,19 +75,16 @@ public class RecoursService {
 
         Recours savedRecours = recoursRepository.save(recours);
 
-        // Ajout des appelants
         if (request.getAppelants() != null && !request.getAppelants().isEmpty()) {
             for (RecoursRequest.AppelantDTO dto : request.getAppelants()) {
                 Appelant appelant = createAppelantFromDTO(savedRecours, dto);
                 appelantRepository.save(appelant);
             }
         } else {
-            // Ajouter automatiquement le déposant comme appelant principal
             Appelant deposantAsAppelant = createAppelantFromUser(savedRecours, utilisateur);
             appelantRepository.save(deposantAsAppelant);
         }
 
-        // Ajout des accusés
         if (request.getAccuses() != null && !request.getAccuses().isEmpty()) {
             for (RecoursRequest.AccuseDTO dto : request.getAccuses()) {
                 Accuse accuse = createAccuseFromDTO(savedRecours, dto);
@@ -96,7 +92,6 @@ public class RecoursService {
             }
         }
 
-        // Ajout des témoins
         if (request.getTemoins() != null && !request.getTemoins().isEmpty()) {
             for (RecoursRequest.TemoinDTO dto : request.getTemoins()) {
                 Temoin temoin = createTemoinFromDTO(savedRecours, dto);
@@ -104,14 +99,18 @@ public class RecoursService {
             }
         }
 
-        // Enregistrement dans l'historique
+        if (request.getVictimes() != null && !request.getVictimes().isEmpty()) {
+            for (RecoursRequest.VictimeDTO dto : request.getVictimes()) {
+                Victime victime = createVictimeFromDTO(savedRecours, dto);
+                victimeRepository.save(victime);
+            }
+        }
+
         saveHistoriqueStatut(savedRecours, null, StatutRecours.DEPOSE, utilisateur,
                 "Dépôt initial du recours", "إيداع أولي للطعن");
 
-        // Notification au greffe
         notificationService.notifierGreffeNouveauRecours(savedRecours);
 
-        // Audit log
         auditLogService.logAction(utilisateur, "CREATE_RECOURS",
                 "Création du recours n° " + numeroRecours);
 
@@ -227,10 +226,44 @@ public class RecoursService {
                 .build();
     }
 
+
+    // Méthode simplifiée (sans NaturePrejudice Enum)
+    private Victime createVictimeFromDTO(Recours recours, RecoursRequest.VictimeDTO dto) {
+        return Victime.builder()
+                .recours(recours)
+                .cin(dto.getCin())
+                .nomFr(dto.getNomFr())
+                .prenomFr(dto.getPrenomFr())
+                .nomAr(dto.getNomAr())
+                .prenomAr(dto.getPrenomAr())
+                .genre(dto.getGenre() != null ? Genre.valueOf(dto.getGenre()) : Genre.HOMME)
+                .dateNaissance(dto.getDateNaissance())
+                .lieuNaissanceFr(dto.getLieuNaissanceFr())
+                .lieuNaissanceAr(dto.getLieuNaissanceAr())
+                .situationFamiliale(dto.getSituationFamiliale() != null ?
+                        SituationFamiliale.valueOf(dto.getSituationFamiliale()) : null)
+                .professionFr(dto.getProfessionFr())
+                .professionAr(dto.getProfessionAr())
+                .adresseFr(dto.getAdresseFr())
+                .adresseAr(dto.getAdresseAr())
+                .estMajeur(dto.getEstMajeur() != null ? dto.getEstMajeur() : true)
+                .naturePrejudice(dto.getNaturePrejudice()) // String direct
+                .descriptionPrejudiceFr(dto.getDescriptionPrejudiceFr())
+                .descriptionPrejudiceAr(dto.getDescriptionPrejudiceAr())
+                .tuteurNomFr(dto.getTuteurNomFr())
+                .tuteurPrenomFr(dto.getTuteurPrenomFr())
+                .tuteurNomAr(dto.getTuteurNomAr())
+                .tuteurPrenomAr(dto.getTuteurPrenomAr())
+                .tuteurCin(dto.getTuteurCin())
+                .build();
+    }
+
     // ============================================================
     // Recherche
     // ============================================================
 
+    // ✅ AJOUT : @Transactional(readOnly = true)
+    @Transactional(readOnly = true)
     public RecoursResponse findById(Long id) {
         Recours recours = recoursRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Recours non trouvé avec l'ID : " + id));
@@ -241,11 +274,11 @@ public class RecoursService {
         return recoursRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Recours non trouvé avec l'ID : " + id));
     }
+
     @Transactional(readOnly = true)
     public List<RecoursResponse> findByUtilisateur(Long utilisateurId) {
         User utilisateur = userRepository.findById(utilisateurId)
                 .orElseThrow(() -> new ResourceNotFoundException("Utilisateur non trouvé"));
-
         return recoursRepository.findByUtilisateur(utilisateur).stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
@@ -276,20 +309,52 @@ public class RecoursService {
 
         recours.setStatut(nouveauStatut);
 
+        // ✅ حفظ تاريخ الجلسة
+        if (request.getDateAudience() != null && !request.getDateAudience().isEmpty()) {
+            try {
+                LocalDate audienceDate = LocalDate.parse(request.getDateAudience());
+                recours.setDateAudience(audienceDate);
+            } catch (Exception e) {
+                System.err.println("Erreur parsing dateAudience: " + request.getDateAudience());
+            }
+        }
+
+        // ✅ حفظ أعضاء الهيئة القضائية
+        if (request.getPresidentNom() != null && !request.getPresidentNom().isEmpty()) {
+            recours.setPresidentNom(request.getPresidentNom());
+        }
+        if (request.getMembre1Nom() != null && !request.getMembre1Nom().isEmpty()) {
+            recours.setMembre1Nom(request.getMembre1Nom());
+        }
+        if (request.getMembre2Nom() != null && !request.getMembre2Nom().isEmpty()) {
+            recours.setMembre2Nom(request.getMembre2Nom());
+        }
+        if (request.getRepresentantMinistere() != null && !request.getRepresentantMinistere().isEmpty()) {
+            recours.setRepresentantMinistere(request.getRepresentantMinistere());
+        }
+        if (request.getGreffierAudience() != null && !request.getGreffierAudience().isEmpty()) {
+            recours.setGreffierAudience(request.getGreffierAudience());
+        }
+
+        // ✅✅✅ حفظ القرار النهائي في جدول recours ✅✅✅
+        if (request.getDecisionFinaleFr() != null && !request.getDecisionFinaleFr().isEmpty()) {
+            recours.setDecisionFinaleFr(request.getDecisionFinaleFr());
+        }
+        if (request.getDecisionFinaleAr() != null && !request.getDecisionFinaleAr().isEmpty()) {
+            recours.setDecisionFinaleAr(request.getDecisionFinaleAr());
+        }
+
         if (nouveauStatut == StatutRecours.JUGE || nouveauStatut == StatutRecours.REJETE) {
             recours.setDateJugement(LocalDate.now());
         }
 
         Recours savedRecours = recoursRepository.save(recours);
 
-        // Enregistrement dans l'historique
         saveHistoriqueStatut(savedRecours, ancienStatut, nouveauStatut, modifiePar,
                 request.getCommentaireFr(), request.getCommentaireAr());
 
-        // Notification au justiciable
         notificationService.notifierChangementStatut(savedRecours, ancienStatut, nouveauStatut);
 
-        // Audit log
         auditLogService.logAction(modifiePar, "CHANGE_STATUT",
                 "Changement de statut du recours n° " + recours.getNumeroRecours() +
                         " de " + ancienStatut + " à " + nouveauStatut);
@@ -314,7 +379,7 @@ public class RecoursService {
     }
 
     // ============================================================
-    // Gestion des décisions finales
+    // Gestion des décisions finales - CORRIGÉ
     // ============================================================
 
     @Transactional
@@ -326,7 +391,9 @@ public class RecoursService {
         recours.setDecisionFinaleAr(decisionAr);
 
         if (fichier != null && !fichier.isEmpty()) {
-            String cheminFichier = uploadFile(fichier, "decisions");
+            // Utiliser le chemin hiérarchique au lieu de "decisions"
+            String cheminDecision = buildCheminFromRecours(recours);
+            String cheminFichier = uploadFile(fichier, cheminDecision);
             recours.setFichierDecision(cheminFichier);
         }
 
@@ -347,24 +414,22 @@ public class RecoursService {
         return toResponse(savedRecours);
     }
 
-// ============================================================
-// REMPLACER les 3 méthodes ci-dessus par ceci :
-// ============================================================
-
-// ============================================================
-// Gestion des pièces jointes (version avec chemin hiérarchique)
-// ============================================================
+    // ============================================================
+    // Gestion des pièces jointes (version avec chemin hiérarchique)
+    // ============================================================
 
     @Transactional
     public PieceJointe uploadPiece(Long recoursId, MultipartFile file, TypeDocument typeDocument,
                                    String descriptionFr, String descriptionAr, String cheminStockage) throws IOException {
         Recours recours = findEntityById(recoursId);
 
-        // Si un chemin de stockage est fourni (ex: "2026/2609/72/"), l'utiliser
-        // Sinon, utiliser "pieces/" comme avant
-        String dossierStockage = (cheminStockage != null && !cheminStockage.isEmpty())
-                ? cheminStockage
-                : "pieces";
+        // Construire le chemin de stockage si non fourni
+        String dossierStockage;
+        if (cheminStockage != null && !cheminStockage.isEmpty() && !cheminStockage.equals("pieces")) {
+            dossierStockage = cheminStockage;
+        } else {
+            dossierStockage = buildCheminFromRecours(recours);
+        }
 
         String cheminFichier = uploadFile(file, dossierStockage);
 
@@ -372,7 +437,7 @@ public class RecoursService {
                 .recours(recours)
                 .nomFichier(file.getOriginalFilename())
                 .cheminFichier(cheminFichier)
-                .cheminStockage(dossierStockage)  // Stocker le chemin hiérarchique
+                .cheminStockage(dossierStockage)
                 .typeDocument(typeDocument)
                 .descriptionFr(descriptionFr)
                 .descriptionAr(descriptionAr)
@@ -383,31 +448,76 @@ public class RecoursService {
         return pieceJointeRepository.save(pieceJointe);
     }
 
-    // Surcharge pour rétrocompatibilité (sans cheminStockage)
+    // Surcharge pour rétrocompatibilité
     @Transactional
     public PieceJointe uploadPiece(Long recoursId, MultipartFile file, TypeDocument typeDocument,
                                    String descriptionFr, String descriptionAr) throws IOException {
-        return uploadPiece(recoursId, file, typeDocument, descriptionFr, descriptionAr, "pieces");
+        return uploadPiece(recoursId, file, typeDocument, descriptionFr, descriptionAr, null);
+    }
+
+    // ============================================================
+    // Méthodes utilitaires d'upload
+    // ============================================================
+
+    /**
+     * Construit le chemin de stockage à partir du numéro de décision attaquée
+     * Format : "SEQ/CODE/ANNEE" -> "ANNEE/CODE/SEQ/"
+     */
+    private String buildCheminFromRecours(Recours recours) {
+        if (recours.getNumeroDecisionAttaque() != null && recours.getNumeroDecisionAttaque().contains("/")) {
+            String[] parts = recours.getNumeroDecisionAttaque().split("/");
+            if (parts.length == 3) {
+                return parts[2] + "/" + parts[1] + "/" + parts[0] + "/";
+            }
+        }
+
+        // Fallback
+        String annee = String.valueOf(LocalDate.now().getYear());
+        String code = recours.getTypeRecours() != null ? recours.getTypeRecours().getCode() : "AUTRE";
+        String seq = String.valueOf(recours.getId());
+        return annee + "/" + code + "/" + seq + "/";
     }
 
     private String uploadFile(MultipartFile file, String sousDossier) throws IOException {
-        // Construire le chemin complet : uploadDir/sousDossier/
-        Path uploadPath = Paths.get(uploadDir, sousDossier);
+        String cleanPath = sousDossier.replaceAll("^/+|/+$", "");
+
+        Path uploadPath = Paths.get(uploadDir, cleanPath);
         if (!Files.exists(uploadPath)) {
             Files.createDirectories(uploadPath);
+            System.out.println("[UPLOAD] Dossier créé: " + uploadPath.toAbsolutePath());
         }
 
-        String fileName = UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
+        String originalFilename = file.getOriginalFilename();
+        String extension = "";
+        if (originalFilename != null && originalFilename.contains(".")) {
+            extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+        }
+        String fileName = UUID.randomUUID().toString() + extension;
+
         Path filePath = uploadPath.resolve(fileName);
-        Files.copy(file.getInputStream(), filePath);
+        Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+        System.out.println("[UPLOAD] Fichier sauvegardé: " + filePath.toAbsolutePath());
 
         return filePath.toString();
     }
 
     private String calculateHash(MultipartFile file) {
-        // Implémentation simplifiée - à compléter avec SHA-256
-        return UUID.randomUUID().toString().replace("-", "");
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(file.getBytes());
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (Exception e) {
+            return UUID.randomUUID().toString().replace("-", "");
+        }
     }
+
     // ============================================================
     // Statistiques
     // ============================================================
@@ -416,43 +526,38 @@ public class RecoursService {
         return recoursRepository.countByStatut(statut);
     }
 
-    public java.util.Map<StatutRecours, Long> getStatistiquesParStatut() {
-        return java.util.Arrays.stream(StatutRecours.values())
-                .collect(Collectors.toMap(
-                        statut -> statut,
-                        this::countByStatut
-                ));
+    public Map<StatutRecours, Long> getStatistiquesParStatut() {
+        return Arrays.stream(StatutRecours.values())
+                .collect(Collectors.toMap(statut -> statut, this::countByStatut));
     }
 
     // ============================================================
     // Conversion DTO
     // ============================================================
 
-    // ============================================================
-// CORRECTION FINALE : toResponse() avec gestion des listes null
-// et accès sécurisé aux objets imbriqués
-// ============================================================
     private RecoursResponse toResponse(Recours recours) {
         return RecoursResponse.builder()
                 .id(recours.getId())
                 .numeroRecours(recours.getNumeroRecours())
-
-                // Accès sécurisé au typeRecours
+                // ✅ AJOUT : dossier
+                .dossierId(recours.getDossier() != null ? recours.getDossier().getId() : null)
+                .dossierNumero(recours.getDossier() != null ? recours.getDossier().getNumeroDossier() : null)
+                .dossierTitreFr(recours.getDossier() != null ? recours.getDossier().getTitreFr() : null)
+                .dossierTitreAr(recours.getDossier() != null ? recours.getDossier().getTitreAr() : null)
+                // Type recours
                 .typeRecoursId(recours.getTypeRecours() != null ? recours.getTypeRecours().getId() : null)
                 .typeRecoursCode(recours.getTypeRecours() != null ? recours.getTypeRecours().getCode() : null)
                 .typeRecoursLibelleFr(recours.getTypeRecours() != null ? recours.getTypeRecours().getLibelleFr() : null)
                 .typeRecoursLibelleAr(recours.getTypeRecours() != null ? recours.getTypeRecours().getLibelleAr() : null)
                 .typeRecoursCategorie(recours.getTypeRecours() != null ? recours.getTypeRecours().getCategorie() : null)
-
-                // Accès sécurisé à l'utilisateur
+                // Déposant
                 .deposantId(recours.getUtilisateur() != null ? recours.getUtilisateur().getId() : null)
                 .deposantNomFr(recours.getUtilisateur() != null ? recours.getUtilisateur().getNomFr() : null)
                 .deposantPrenomFr(recours.getUtilisateur() != null ? recours.getUtilisateur().getPrenomFr() : null)
                 .deposantNomAr(recours.getUtilisateur() != null ? recours.getUtilisateur().getNomAr() : null)
                 .deposantPrenomAr(recours.getUtilisateur() != null ? recours.getUtilisateur().getPrenomAr() : null)
                 .deposantEmail(recours.getUtilisateur() != null ? recours.getUtilisateur().getEmail() : null)
-
-                // Champs simples (pas de risque NPE)
+                // Décision attaquée
                 .numeroDecisionAttaque(recours.getNumeroDecisionAttaque())
                 .dateDecisionAttaque(recours.getDateDecisionAttaque())
                 .juridictionSourceFr(recours.getJuridictionSourceFr())
@@ -460,6 +565,7 @@ public class RecoursService {
                 .moyensRecoursFr(recours.getMoyensRecoursFr())
                 .moyensRecoursAr(recours.getMoyensRecoursAr())
                 .fichierMoyens(recours.getFichierMoyens())
+                // Statut et dates
                 .statut(recours.getStatut())
                 .dateDepot(recours.getDateDepot())
                 .dateAudience(recours.getDateAudience())
@@ -468,126 +574,105 @@ public class RecoursService {
                 .decisionFinaleAr(recours.getDecisionFinaleAr())
                 .fichierDecision(recours.getFichierDecision())
                 .chambre(recours.getChambre())
-
-                // Listes avec vérification null
+                // Compteurs
                 .nombreAppelants(recours.getAppelants() != null ? recours.getAppelants().size() : 0)
                 .nombreAccuses(recours.getAccuses() != null ? recours.getAccuses().size() : 0)
                 .nombreTemoins(recours.getTemoins() != null ? recours.getTemoins().size() : 0)
                 .nombrePiecesJointes(recours.getPiecesJointes() != null ? recours.getPiecesJointes().size() : 0)
+
+                // ✅✅✅ أضف هذه الحقول (أعضاء الهيئة القضائية) ✅✅✅
+                .presidentNom(recours.getPresidentNom())
+                .membre1Nom(recours.getMembre1Nom())
+                .membre2Nom(recours.getMembre2Nom())
+                .representantMinistere(recours.getRepresentantMinistere())
+                .greffierAudience(recours.getGreffierAudience())
+
                 .build();
     }
+
     private RecoursResponse toDetailedResponse(Recours recours) {
         RecoursResponse response = toResponse(recours);
 
-        // Ajout des listes détaillées
         response.setAppelants(recours.getAppelants().stream()
-                .map(this::toAppelantResponse)
-                .collect(Collectors.toList()));
-
+                .map(this::toAppelantResponse).collect(Collectors.toList()));
         response.setAccuses(recours.getAccuses().stream()
-                .map(this::toAccuseResponse)
-                .collect(Collectors.toList()));
-
+                .map(this::toAccuseResponse).collect(Collectors.toList()));
         response.setTemoins(recours.getTemoins().stream()
-                .map(this::toTemoinResponse)
-                .collect(Collectors.toList()));
-
+                .map(this::toTemoinResponse).collect(Collectors.toList()));
         response.setPiecesJointes(recours.getPiecesJointes().stream()
-                .map(this::toPieceJointeResponse)
-                .collect(Collectors.toList()));
-
+                .map(this::toPieceJointeResponse).collect(Collectors.toList()));
         response.setHistorique(historiqueStatutRepository.findByRecoursOrderByDateModificationDesc(recours).stream()
-                .map(this::toHistoriqueResponse)
-                .collect(Collectors.toList()));
+                .map(this::toHistoriqueResponse).collect(Collectors.toList()));
 
         return response;
     }
 
     private RecoursResponse.AppelantResponseDTO toAppelantResponse(Appelant appelant) {
         return RecoursResponse.AppelantResponseDTO.builder()
-                .id(appelant.getId())
-                .cin(appelant.getCin())
-                .nomFr(appelant.getNomFr())
-                .prenomFr(appelant.getPrenomFr())
-                .nomAr(appelant.getNomAr())
-                .prenomAr(appelant.getPrenomAr())
-                .qualiteFr(appelant.getQualiteFr())
-                .qualiteAr(appelant.getQualiteAr())
-                .estMajeur(appelant.getEstMajeur())
-                .build();
+                .id(appelant.getId()).cin(appelant.getCin())
+                .nomFr(appelant.getNomFr()).prenomFr(appelant.getPrenomFr())
+                .nomAr(appelant.getNomAr()).prenomAr(appelant.getPrenomAr())
+                .qualiteFr(appelant.getQualiteFr()).qualiteAr(appelant.getQualiteAr())
+                .estMajeur(appelant.getEstMajeur()).build();
     }
 
     private RecoursResponse.AccuseResponseDTO toAccuseResponse(Accuse accuse) {
         return RecoursResponse.AccuseResponseDTO.builder()
-                .id(accuse.getId())
-                .cin(accuse.getCin())
-                .nomFr(accuse.getNomFr())
-                .prenomFr(accuse.getPrenomFr())
-                .nomAr(accuse.getNomAr())
-                .prenomAr(accuse.getPrenomAr())
+                .id(accuse.getId()).cin(accuse.getCin())
+                .nomFr(accuse.getNomFr()).prenomFr(accuse.getPrenomFr())
+                .nomAr(accuse.getNomAr()).prenomAr(accuse.getPrenomAr())
                 .situationPenale(accuse.getSituationPenale() != null ? accuse.getSituationPenale().name() : null)
                 .lieuDetention(accuse.getLieuDetention())
-                .qualificationFr(accuse.getQualificationFr())
-                .qualificationAr(accuse.getQualificationAr())
-                .estMajeur(accuse.getEstMajeur())
-                .build();
+                .qualificationFr(accuse.getQualificationFr()).qualificationAr(accuse.getQualificationAr())
+                .estMajeur(accuse.getEstMajeur()).build();
     }
 
     private RecoursResponse.TemoinResponseDTO toTemoinResponse(Temoin temoin) {
         return RecoursResponse.TemoinResponseDTO.builder()
-                .id(temoin.getId())
-                .cin(temoin.getCin())
-                .nomFr(temoin.getNomFr())
-                .prenomFr(temoin.getPrenomFr())
-                .nomAr(temoin.getNomAr())
-                .prenomAr(temoin.getPrenomAr())
-                .professionFr(temoin.getProfessionFr())
-                .professionAr(temoin.getProfessionAr())
+                .id(temoin.getId()).cin(temoin.getCin())
+                .nomFr(temoin.getNomFr()).prenomFr(temoin.getPrenomFr())
+                .nomAr(temoin.getNomAr()).prenomAr(temoin.getPrenomAr())
+                .professionFr(temoin.getProfessionFr()).professionAr(temoin.getProfessionAr())
                 .telephone(temoin.getTelephone())
-                .temoignageFr(temoin.getTemoignageFr())
-                .temoignageAr(temoin.getTemoignageAr())
-                .build();
+                .temoignageFr(temoin.getTemoignageFr()).temoignageAr(temoin.getTemoignageAr()).build();
     }
 
     private RecoursResponse.PieceJointeResponseDTO toPieceJointeResponse(PieceJointe piece) {
         return RecoursResponse.PieceJointeResponseDTO.builder()
-                .id(piece.getId())
-                .nomFichier(piece.getNomFichier())
+                .id(piece.getId()).nomFichier(piece.getNomFichier())
                 .typeDocument(piece.getTypeDocument() != null ? piece.getTypeDocument().name() : null)
-                .descriptionFr(piece.getDescriptionFr())
-                .descriptionAr(piece.getDescriptionAr())
-                .dateUpload(piece.getDateUpload())
-                .tailleOctets(piece.getTailleOctets())
-                .build();
+                .descriptionFr(piece.getDescriptionFr()).descriptionAr(piece.getDescriptionAr())
+                .dateUpload(piece.getDateUpload()).tailleOctets(piece.getTailleOctets()).build();
     }
 
     private RecoursResponse.HistoriqueStatutResponseDTO toHistoriqueResponse(HistoriqueStatut historique) {
         return RecoursResponse.HistoriqueStatutResponseDTO.builder()
                 .id(historique.getId())
-                .ancienStatut(historique.getAncienStatut())
-                .nouveauStatut(historique.getNouveauStatut())
-                .modifieParNom(historique.getModifiePar().getFullNameFr())
+                .ancienStatut(historique.getAncienStatut()).nouveauStatut(historique.getNouveauStatut())
+                .modifieParNom(historique.getModifiePar() != null ? historique.getModifiePar().getFullNameFr() : "Système")
                 .dateModification(historique.getDateModification())
-                .commentaireFr(historique.getCommentaireFr())
-                .commentaireAr(historique.getCommentaireAr())
-                .build();
+                .commentaireFr(historique.getCommentaireFr()).commentaireAr(historique.getCommentaireAr()).build();
     }
-    // Ajouter ces méthodes dans RecoursService.java
 
+    // ============================================================
+    // Méthodes supplémentaires
+    // ============================================================
+
+    // ✅ AJOUT : @Transactional(readOnly = true)
+    @Transactional(readOnly = true)
     public RecoursResponse findByNumeroRecours(String numero) {
         Recours recours = recoursRepository.findByNumeroRecours(numero)
-                .orElseThrow(() -> new ResourceNotFoundException("Recours non trouvé avec le numéro : " + numero));
+                .orElseThrow(() -> new ResourceNotFoundException("Recours non trouvé: " + numero));
         return toDetailedResponse(recours);
     }
 
+    // ✅ AJOUT : @Transactional(readOnly = true)
+    @Transactional(readOnly = true)
     public RecoursResponse findDetailedById(Long id) {
-        Recours recours = findEntityById(id);
-        return toDetailedResponse(recours);
+        return toDetailedResponse(findEntityById(id));
     }
 
-    public long countAll() {
-        return recoursRepository.count();
-    }
+    public long countAll() { return recoursRepository.count(); }
 
     public long countByUtilisateur(Long userId) {
         User user = userRepository.findById(userId)
@@ -598,7 +683,6 @@ public class RecoursService {
     public Map<String, Long> getStatistiquesParStatutForUser(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Utilisateur non trouvé"));
-
         List<Object[]> results = recoursRepository.countByStatutGroupByStatutForUser(user);
         Map<String, Long> stats = new HashMap<>();
         for (Object[] result : results) {
@@ -610,8 +694,7 @@ public class RecoursService {
     public List<RecoursResponse> findRecentRecours(int limit) {
         Pageable pageable = PageRequest.of(0, limit, Sort.by("dateDepot").descending());
         return recoursRepository.findRecentRecours(pageable).stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+                .map(this::toResponse).collect(Collectors.toList());
     }
 
     @Transactional
@@ -631,11 +714,9 @@ public class RecoursService {
 
     public List<RecoursResponse> rechercheAvancee(String numero, String cin, String nom,
                                                   String statut, String dateDebut, String dateFin) {
-        // Implémentation simplifiée - à enrichir
         if (numero != null && !numero.isEmpty()) {
             return recoursRepository.findByNumeroRecours(numero)
-                    .map(recours -> List.of(toResponse(recours)))
-                    .orElse(List.of());
+                    .map(recours -> List.of(toResponse(recours))).orElse(List.of());
         }
         return findAll();
     }
@@ -643,6 +724,58 @@ public class RecoursService {
     public Double getDelaiMoyenTraitement() {
         return historiqueStatutRepository.getDelaiMoyenTraitement();
     }
+    // ============================================================
+    // إحصائيات إضافية - ADDED
+    // ============================================================
 
+    public long countAllDossiers() {
+        return dossierRepository.count();
+    }
 
+    public long countRecoursDepuisJours(int jours) {
+        LocalDateTime date = LocalDateTime.now().minusDays(jours);
+        return recoursRepository.countByDateDepotAfter(date);
+    }
+
+    public Map<String, Long> getRecoursParMois(int nombreMois) {
+        Map<String, Long> result = new LinkedHashMap<>();
+        LocalDateTime now = LocalDateTime.now();
+        java.time.format.DateTimeFormatter formatter =
+                java.time.format.DateTimeFormatter.ofPattern("MMM");
+
+        for (int i = nombreMois - 1; i >= 0; i--) {
+            LocalDateTime debutMois = now.minusMonths(i).withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0);
+            LocalDateTime finMois = debutMois.plusMonths(1).minusSeconds(1);
+
+            long count = recoursRepository.countByDateDepotBetween(debutMois, finMois);
+            String moisKey = debutMois.format(formatter);
+            result.put(moisKey, count);
+        }
+        return result;
+    }
+
+    public long countRecoursEntreDates(java.time.LocalDate debut, java.time.LocalDate fin) {
+        LocalDateTime debutDateTime = debut.atStartOfDay();
+        LocalDateTime finDateTime = fin.plusDays(1).atStartOfDay().minusSeconds(1);
+        return recoursRepository.countByDateDepotBetween(debutDateTime, finDateTime);
+    }
+
+    public Map<String, Long> getEvolutionParMois(java.time.LocalDate debut, java.time.LocalDate fin) {
+        Map<String, Long> result = new LinkedHashMap<>();
+        java.time.format.DateTimeFormatter formatter =
+                java.time.format.DateTimeFormatter.ofPattern("MMM yyyy");
+
+        LocalDate current = debut;
+        while (!current.isAfter(fin)) {
+            LocalDateTime debutMois = current.withDayOfMonth(1).atStartOfDay();
+            LocalDateTime finMois = current.withDayOfMonth(current.lengthOfMonth()).atTime(23, 59, 59);
+
+            long count = recoursRepository.countByDateDepotBetween(debutMois, finMois);
+            String moisKey = current.format(formatter);
+            result.put(moisKey, count);
+
+            current = current.plusMonths(1);
+        }
+        return result;
+    }
 }

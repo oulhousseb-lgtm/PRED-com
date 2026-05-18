@@ -109,4 +109,20 @@ public class NotificationService {
     public long countNotificationsNonLues(User utilisateur) {
         return notificationRepository.countByUtilisateurAndLuFalse(utilisateur);
     }
+    // ✅ Supprimer une notification
+    public void deleteNotification(Long id, User user) {
+        Notification notification = notificationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Notification non trouvée"));
+
+        if (!notification.getUtilisateur().getId().equals(user.getId())) {
+            throw new RuntimeException("Accès non autorisé");
+        }
+
+        notificationRepository.delete(notification);
+    }
+
+    // ✅ Supprimer toutes les notifications d'un utilisateur
+    public void deleteAllNotifications(User user) {
+        notificationRepository.deleteByUtilisateur(user);
+    }
 }
